@@ -1,4 +1,4 @@
-import { Component } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { PixabayApiService } from '../../services/pixabay-api';
 import { Searchbar } from '../searchbar/Searchbar';
 import { ImageGallery } from '../image-gallery/ImageGallery';
@@ -8,107 +8,102 @@ import { Loader } from '../loader/Loader';
 import { Button } from '../button/Button';
 import { Modal } from '../modal/Modal';
 
+
 const PER_PAGE = 12;
 const pixabayApiService = new PixabayApiService(); 
 
-export class App extends Component{
-  state = {
-    page: 1,
-    query: '',
-    error: '',
-    images: [],
-    totalImages: 0,
-    status: 'idle',
-    selectedImgUrl: '',
-    firstElOfPageId: '',
-  };
+export const App = () => {
 
-  componentDidUpdate(prevProps, prevState) {
-    const prevQuery = prevState.query;
-    const newQuery = this.state.query;
-    const prevPage = prevState.page;
-    const currentPage = this.state.page;
-        
-        if (prevQuery !== newQuery || prevPage !== currentPage) {
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
+  const [error, setError] = useState('');
+  const [images, setImages] = useState([]);
+  const [totalImages, setTotalImages] = useState(0);
+  const [status, setStatus] = useState('idle');
+  const [selectedImgUrl, setSelectedImgUrl] = useState('');
+  // const [firstElOfPageId, setFirstElOfPageId] = useState('');
 
-            this.setState({ status: 'pending' });
-
-            pixabayApiService.query = newQuery;
-            pixabayApiService.page = currentPage;
-
-            pixabayApiService.fetchImages().then(responce => {
-              if (responce.hits.length > 0) {
-                  this.setState(prevState => ({ images: [...prevState.images, ...responce.hits], status: 'resolved', firstElOfPageId: responce.hits[0].id, totalImages: responce.totalHits  }), this.scrollToNextPage);
-                    // window.scrollByPages(currentPage) ;
-                } else {
-                    this.setState({ error: `There are no images with key word ${newQuery}`, status: 'rejected'})
-                }
-            }).catch(error => this.setState({ error: error.message, status: 'rejected' }));
-        }
-  }
-
-  scrollToNextPage = () => {
-    const headerHeight = 90;
-    if (this.state.page > 1) {
-      const firstElOnPagePos = document.getElementById(this.state.firstElOfPageId).offsetTop - headerHeight;
-      window.scrollTo({
-      // top: document.documentElement.scrollHeight,
-        top: firstElOnPagePos,
-        behavior: 'smooth',
-  });
-   }
-};
-
-  onLoadMore = () => {
-    this.setState(prevState => ({ page: prevState.page + 1, }), );
-  }
-  
-    onShowModal = (lageImageUrl) => {
-       this.setState({
-           selectedImgUrl: lageImageUrl,
-        });
-    }
-
-    onCloseModal = () => {
-        this.setState({
-            selectedImgUrl: '',
-        })
-    }
-    handleSelectedImg(url) {
-        
-        this.setState({ selectedImgUrl: url });
-    }
-
-  formSubmitHandler = ({query}, { resetForm }) => {
-    this.setState({
-      page: 1,
-      query,
-      images: [],
-    });
-     resetForm();
-  }
-
-  render() {
-    const { images, error, page, status, totalImages, selectedImgUrl } = this.state; 
+  useEffect(() => {
     
-    return (
+  async function getImages() {
+    try {
+        const {hits, totalHits} = await pixabayApiService.fetchImages();
+        
+        if (hits.length > 0) {
+          setImages(prevState => [...prevState, ...hits]);
+          setStatus('resolved');
+          setTotalImages(totalHits);
+
+      } else {
+          setError(`There are no images with key word ${query}`);
+          setStatus('rejected');
+        }
+      }
+      catch (error){
+        setError(error.message);
+        setStatus('rejected');
+      }
+    }
+
+    if (query !== '') {
+    
+      setStatus('pending');
+      pixabayApiService.query = query;
+      pixabayApiService.page = page;
+      
+      getImages();
+    }        
+  }, [query, page]);
+
+  
+  // const scrollToNextPage = () => {
+  //   const headerHeight = 90;
+  //   if (page > 1) {
+  //     const firstElOnPagePos = document.getElementById(firstElOfPageId).offsetTop - headerHeight;
+  //     window.scrollTo({
+  //       top: firstElOnPagePos,
+  //       behavior: 'smooth',
+  // });
+  //  }
+  // };
+  
+  useLayoutEffect(() => {
+    const CARD_HEIGHT = 260;
+
+      window.scrollTo({
+      //  top: document.documentElement.scrollHeight,
+        top: CARD_HEIGHT * 2 * page,
+        behavior: 'smooth',
+      });
+  });
+
+  const formSubmitHandler = ({ query }, { resetForm }) => {
+    setPage(1);
+    setQuery(query);
+    setImages([]);
+
+    resetForm();
+  }
+    
+  return (
       <Container>
-        <Searchbar onSubmit={this.formSubmitHandler} />
+        <Searchbar onSubmit={formSubmitHandler} />
         {status === 'idle' && <Message text="Enter something..." />}
         {status === 'rejected' && <Message text={error} />}
         {status === 'pending' && <Loader />}
         {status === 'resolved' && <>
-          <ImageGallery firstImgOnPageId={this.firstImgOnPageId} images={images} onShowModal={this.onShowModal} />
+          <ImageGallery images={images} onShowModal={setSelectedImgUrl} />
           
         </>}
-        {status === 'resolved' && Math.ceil(totalImages / PER_PAGE) !== page && <Button onClick={this.onLoadMore} />}
+      {status === 'resolved' && Math.ceil(totalImages / PER_PAGE) !== page &&
+        <Button onClick={() => setPage(prevState => prevState + 1)} /> }
         {selectedImgUrl.length > 0 && (
-                 <Modal onClose={this.onCloseModal}>
+                 <Modal onClose={() => setSelectedImgUrl('')}>
                     <img src={selectedImgUrl} alt="" />
                  </Modal>
             )}
       </Container>
     )
-  }
-};
+}
+
 

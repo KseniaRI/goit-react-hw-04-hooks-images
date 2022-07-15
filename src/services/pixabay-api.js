@@ -7,14 +7,16 @@ export class PixabayApiService {
         this.page = 1;
     }
     
-    fetchImages(){
-       return fetch(`${BASE_URL}/?q=${this.searchQuery}&key=${API_KEY}&image_type=photo&orientation=horizontal&per_page=12&page=${this.page}`)
-            .then(responce => {
-                if (responce.ok) {
-                    return responce.json();
-                }
-                return Promise.reject(new Error(`Something went wrong. There are no ${this.searchQuery} images`));
-            });
+    async fetchImages() {
+        
+        try {
+            const responce = await fetch(`${BASE_URL}/?q=${this.searchQuery}&key=${API_KEY}&image_type=photo&orientation=horizontal&per_page=12&page=${this.page}`); 
+             return responce.json();
+        } catch (error) {
+            return Promise.reject(new Error(`Something went wrong. There are no ${this.searchQuery} images`));
+        }
+
+            
     }
 
     get query() {
